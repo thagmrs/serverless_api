@@ -1,0 +1,156 @@
+openapi: 3.0.1
+info:
+  title: API para Escoragem de Modelo de Sobrevivência do Titanic
+  description: API que fornece informações sobre a sobrevivência de passageiros do Titanic, incluindo escoragem de modelo e operações CRUD.
+  version: 1.0.0
+paths:
+  /sobreviventes:
+    get:
+      summary: Retorna uma lista de passageiros avaliados
+      description: Retorna um JSON com a lista de passageiros que já foram avaliados. Pode incluir paginação.
+      responses:
+        '200':
+          description: Lista de passageiros
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passengers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          description: ID do passageiro
+                        features:
+                          type: object
+                          description: Características do passageiro
+                        prediction:
+                          type: number
+                          format: float
+                          description: Probabilidade de sobrevivência
+    post:
+      summary: Escora o modelo de sobrevivência
+      description: Recebe um JSON com características do passageiro e retorna a probabilidade de sobrevivência junto com o ID do passageiro.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: ID do passageiro
+                features:
+                  type: object
+                  properties:
+                    Embarked_Q:
+                      type: number
+                      format: float
+                    Age:
+                      type: number
+                      format: float
+                    Sex_male:
+                      type: number
+                      format: float
+                    Fare:
+                      type: number
+                      format: float
+                    SibSp:
+                      type: number
+                      format: float
+                    Parch:
+                      type: number
+                      format: float
+                    Pclass:
+                      type: number
+                      format: float
+                    Embarked_S:
+                      type: number
+                      format: float
+      responses:
+        '200':
+          description: Resultado da escoragem
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: ID do passageiro
+                  prediction:
+                    type: number
+                    format: float
+                    description: Probabilidade de sobrevivência
+        '500':
+          description: Erro no processamento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Mensagem de erro
+  /sobreviventes/{id}:
+    get:
+      summary: Retorna a probabilidade de sobrevivência para um passageiro específico
+      description: Retorna um JSON com a probabilidade de sobrevivência do passageiro com o ID informado.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Probabilidade de sobrevivência
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: ID do passageiro
+                  prediction:
+                    type: number
+                    format: float
+                    description: Probabilidade de sobrevivência
+        '404':
+          description: Passageiro não encontrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Mensagem de erro
+  /health:
+    get:
+      summary: Verifica o estado da API
+      description: Retorna um status 200 para verificar se a API está funcionando corretamente.
+      responses:
+        '200':
+          description: API está funcionando
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "API is healthy"
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Mensagem de erro
