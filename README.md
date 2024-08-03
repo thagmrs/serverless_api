@@ -40,7 +40,7 @@ A Lambda Function implementa os seguintes métodos HTTP:
 
 
 ## Executando o Projeto
-** Configuração do Terraform: ** 
+**Configuração do Terraform:** 
 
 Atualize as variáveis no arquivo terraform.tfvars com as informações necessárias para seu ambiente AWS.
 Execute terraform init para inicializar o Terraform.
@@ -50,12 +50,11 @@ Execute terraform apply para criar os recursos na AWS.
 Certifique-se de que o código da Lambda Function está comprimido e disponível em ${path.module}/../lambda_function/lambda_function.zip.
 A função Lambda será automaticamente implantada quando você executar o Terraform.
 
-##Testando a API:
+## Testando a API:
 
 Após o deployment, você receberá um endpoint URL.
 Use ferramentas como curl ou Postman para enviar requisições HTTP para o endpoint.
 
-##Notas
+## Notas
 Certifique-se de que o arquivo lambda_function.zip contém todos os pacotes e dependências necessários.
 Ajuste o modelo e as variáveis de ambiente conforme necessário para seu caso de uso específico.
-
