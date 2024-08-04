@@ -2,11 +2,36 @@ provider "aws" {
   region = var.region
 }
 
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.61.0"
+    }
+  }
+  required_version = ">= 1.0.0"
+}
+
+resource "aws_ecr_repository" "img_docker" {
+  name                 = "img_docker"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+}
+
+resource "null_resource" "docker_image" {
+  provisioner "local-exec" {
+    command = "powershell.exe -File ../docker-build.ps1"
+  }
+
+  triggers = {
+    always_run = "${timestamp()}"
+  }
+  depends_on = [aws_ecr_repository.img_docker]
+}
 
 resource "aws_s3_bucket" "model_bucket" {
   bucket = var.s3_bucket_name
 }
-
 
 resource "aws_s3_object" "model_object" {
   bucket  = aws_s3_bucket.model_bucket.bucket
@@ -48,14 +73,40 @@ resource "aws_iam_role_policy_attachment" "lambda_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_lambda_function" "ml_model" {
-  filename         = "${path.module}/../lambda_function/lambda_function.zip"
-  function_name    = "ml_model"
-  role             = aws_iam_role.lambda_exec.arn
-  handler          = "lambda_function.lambda_handler"
-  runtime          = "python3.8"
-  source_code_hash = filebase64sha256("${path.module}/../lambda_function/lambda_function.zip")
+resource "aws_iam_policy" "s3_access_policy" {
+  name        = "s3_access_policy"
+  description = "Policy for Lambda to access S3 bucket"
+  policy      = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ],
+        Resource = [
+          "${aws_s3_bucket.model_bucket.arn}",
+          "${aws_s3_bucket.model_bucket.arn}/*"
+        ]
+      }
+    ]
+  })
+}
 
+resource "aws_iam_role_policy_attachment" "lambda_s3_policy_attachment" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = aws_iam_policy.s3_access_policy.arn
+}
+
+
+resource "aws_lambda_function" "ml_model" {
+  depends_on = [null_resource.docker_image]
+  function_name = "ml_model"
+  role          = aws_iam_role.lambda_exec.arn
+  image_uri     = "740374395395.dkr.ecr.us-west-2.amazonaws.com/img_docker:latest"
+  package_type  = "Image"
+  timeout       = 15
   environment {
     variables = {
       DYNAMODB_TABLE = aws_dynamodb_table.survivors.name
@@ -118,7 +169,10 @@ resource "aws_api_gateway_integration_response" "post_integration_response" {
 
 resource "aws_api_gateway_deployment" "api_deployment" {
   depends_on = [
-    aws_api_gateway_integration.post_integration
+    aws_api_gateway_integration.post_integration,
+    aws_api_gateway_integration.get_integration,
+    aws_api_gateway_integration.delete_integration,
+    aws_api_gateway_integration.health_integration
   ]
   rest_api_id = aws_api_gateway_rest_api.ml_api.id
   stage_name  = "prod"
@@ -162,17 +216,15 @@ resource "aws_api_gateway_resource" "health_resource" {
   path_part   = "health"
 }
 
-
 # Integração Lambda com o método GET para /health
 resource "aws_api_gateway_integration" "health_integration" {
   rest_api_id = aws_api_gateway_rest_api.ml_api.id
   resource_id = aws_api_gateway_resource.health_resource.id
   http_method = aws_api_gateway_method.health_get_method.http_method
-  type        = "MOCK"
-  integration_http_method = "GET"
-  uri         = "arn:aws:apigateway:${var.region}:lambda:path/2015-03-31/functions/${aws_lambda_function.ml_model.arn}/invocations"
+  type = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri = "arn:aws:apigateway:${var.region}:lambda:path/2015-03-31/functions/${aws_lambda_function.ml_model.arn}/invocations"
 }
-
 
 # Criação do método de resposta para o GET /health
 resource "aws_api_gateway_method_response" "health_get_method_response" {
@@ -181,7 +233,6 @@ resource "aws_api_gateway_method_response" "health_get_method_response" {
   http_method = aws_api_gateway_method.health_get_method.http_method
   status_code = "200"
 }
-
 
 resource "aws_api_gateway_integration_response" "get_integration_response" {
   depends_on  = [aws_api_gateway_integration.get_integration]

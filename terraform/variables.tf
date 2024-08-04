@@ -9,7 +9,7 @@ variable "dynamodb_table_name" {
 }
 
 variable "s3_bucket_name" {
-  description = "The name of the S3 bucket to store the model"
+  description = "The name of the S3 bucket to store the model and layer"
   type        = string
-  default     = "bucket-pickle-2420"
+  default     = "bucket-case-model"
 }
