@@ -18,14 +18,6 @@ data "aws_caller_identity" "current" {}
 data "aws_ecr_authorization_token" "ecr_token" {}
 
 
-
-
-
-
-
-
-
-
 resource "aws_s3_bucket" "model_bucket" {
   bucket = var.s3_bucket_name
 }
@@ -33,7 +25,7 @@ resource "aws_s3_bucket" "model_bucket" {
 resource "aws_s3_object" "model_object" {
   bucket  = aws_s3_bucket.model_bucket.bucket
   key     = "model.pkl"
-  content = filebase64("${path.module}/../model/model.pkl")
+  source = "${path.module}/../model/model.pkl"
 }
 
 resource "aws_dynamodb_table" "survivors" {
@@ -100,7 +92,7 @@ resource "aws_iam_role_policy_attachment" "lambda_s3_policy_attachment" {
 resource "aws_lambda_function" "ml_model" {
   function_name = "ml_model"
   role          = aws_iam_role.lambda_exec.arn
-  image_uri      = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.ecr_repository_name}:v3"
+  image_uri      = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.ecr_repository_name}:v0.6"
   package_type   = "Image"
   timeout       = 15
   environment {
@@ -130,7 +122,7 @@ resource "aws_iam_policy" "lambda_dynamodb_policy" {
           "dynamodb:UpdateItem",
           "dynamodb:DeleteItem"
         ],
-        Resource = "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.dynamodb_table_name}:v.06"
+        Resource = "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.dynamodb_table_name}"
       },
       {
         Effect = "Allow",
@@ -141,6 +133,12 @@ resource "aws_iam_policy" "lambda_dynamodb_policy" {
       }
     ]
   })
+}
+
+resource "aws_iam_policy_attachment" "lambda_dynamodb_policy_attachment" {
+  name       = "lambda_dynamodb_policy_attachment"
+  roles      = [aws_iam_role.lambda_exec.name]
+  policy_arn = aws_iam_policy.lambda_dynamodb_policy.arn
 }
 
 resource "aws_api_gateway_rest_api" "ml_api" {
