@@ -13,3 +13,8 @@ variable "s3_bucket_name" {
   type        = string
   default     = "bucket-case-model"
 }
+
+variable "ecr_repository_name" {
+  description = "The name of the ECR repository"
+  default     = "img_docker"
+}

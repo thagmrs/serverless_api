@@ -12,22 +12,19 @@ terraform {
   required_version = ">= 1.0.0"
 }
 
-resource "aws_ecr_repository" "img_docker" {
-  name                 = "img_docker"
-  image_tag_mutability = "MUTABLE"
-  force_delete         = true
-}
 
-resource "null_resource" "docker_image" {
-  provisioner "local-exec" {
-    command = "powershell.exe -File ../docker-build.ps1"
-  }
+data "aws_caller_identity" "current" {}
 
-  triggers = {
-    always_run = "${timestamp()}"
-  }
-  depends_on = [aws_ecr_repository.img_docker]
-}
+data "aws_ecr_authorization_token" "ecr_token" {}
+
+
+
+
+
+
+
+
+
 
 resource "aws_s3_bucket" "model_bucket" {
   bucket = var.s3_bucket_name
@@ -101,11 +98,10 @@ resource "aws_iam_role_policy_attachment" "lambda_s3_policy_attachment" {
 
 
 resource "aws_lambda_function" "ml_model" {
-  depends_on = [null_resource.docker_image]
   function_name = "ml_model"
   role          = aws_iam_role.lambda_exec.arn
-  image_uri     = "740374395395.dkr.ecr.us-west-2.amazonaws.com/img_docker:latest"
-  package_type  = "Image"
+  image_uri      = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.ecr_repository_name}:v3"
+  package_type   = "Image"
   timeout       = 15
   environment {
     variables = {
@@ -114,6 +110,37 @@ resource "aws_lambda_function" "ml_model" {
       S3_MODEL_KEY   = aws_s3_object.model_object.key
     }
   }
+}
+
+
+# Policy for Lambda to access DynamoDB and other resources
+resource "aws_iam_policy" "lambda_dynamodb_policy" {
+  name        = "lambda_dynamodb_policy"
+  description = "IAM policy for Lambda to access DynamoDB table"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "dynamodb:Scan",
+          "dynamodb:Query",
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem"
+        ],
+        Resource = "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.dynamodb_table_name}:v.06"
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject"
+        ],
+        Resource = "arn:aws:s3:::${var.s3_bucket_name}/*"
+      }
+    ]
+  })
 }
 
 resource "aws_api_gateway_rest_api" "ml_api" {

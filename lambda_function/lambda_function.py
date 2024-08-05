@@ -3,9 +3,12 @@ import boto3
 import os
 import joblib
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
-import numpy as np
+import pandas as pd
 import logging
 from encoder_decimal import CustomEncoder
+import sklearn
+import sys
+from decimal import Decimal
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -21,27 +24,19 @@ table = dynamodb.Table(table_name)
 bucket_name = os.environ.get('S3_BUCKET_NAME')
 model_key = os.environ.get('S3_MODEL_KEY')
 
-model = None
 
 def load_model_from_s3(bucket_name, model_key):
     try:
-        logger.info(f"Downloading model from bucket: {bucket_name}, key: {model_key}")
+        logger.info(f"loading model from bucket: {bucket_name}, key: {model_key}")
         s3.download_file(bucket_name, model_key, '/tmp/model.pkl')
         with open('/tmp/model.pkl', 'rb') as f:
             model = joblib.load(f)
-        logger.info("Model loaded successfully from S3")
+        logger.info(f"model loaded: {model}")
         return model
-    except (NoCredentialsError, PartialCredentialsError) as e:
-        logger.error(f"Error loading model from S3: {str(e)}")
-        raise
     except Exception as e:
-        logger.error(f"Unexpected error loading model from S3: {str(e)}")
+        logger.error(f"ERROR loading model:  {str(e)}")
         raise
 
-try:
-    model = load_model_from_s3(bucket_name, model_key)
-except Exception as e:
-    logger.error(f"Failed to load model: {str(e)}")
 
 getMethod = 'GET'
 postMethod = 'POST'
@@ -53,17 +48,18 @@ def lambda_handler(event, context):
     logger.info(event)
     httpMethod = event['httpMethod']
     path = event['path']
-    path_parameters = event.get('pathParameters', {})
+    path_parameters = event.get('queryStringParameters')
 
     try:
         if httpMethod == getMethod and path == healthPath:
             response = buildResponse(200)
         elif httpMethod == getMethod and path == endpointPath:
-            if 'id' in path_parameters:
+            if path_parameters is None:
+                response = getPassengers()
+            else:
                 passenger_id = path_parameters['id']
                 response = getId(passenger_id)
-            else:
-                response = getPassengers()
+
         elif httpMethod == postMethod and path == endpointPath:
             response = scoreModel(event)
         elif httpMethod == deleteMethod and path == endpointPath:
@@ -73,57 +69,44 @@ def lambda_handler(event, context):
             response = buildResponse(404, 'Not Found')
     except Exception as e:
         logger.exception(f"Error handling request: {str(e)}")
-        response = buildResponse(500, 'Internal Server Error')
+        response = buildResponse(500, f'Internal Server Error: {str(e)}')
 
     return response
 
 def scoreModel(event):
+    print('ENTROU NA v0.4')
+    model = load_model_from_s3(bucket_name, model_key)
+
     try:
-        logger.info("Scoring model...")
+        logger.info("scoring model")
         data = json.loads(event['body'])
-        logger.info(f"Data received for scoring: {data}")
+        logger.info(f"data received: {data}")
 
-        ordered_features = [
-            data['Embarked_Q'],
-            data['Age'],
-            data['Sex_male'],
-            data['Fare'],
-            data['SibSp'],
-            data['Parch'],
-            data['Pclass'],
-            data['Embarked_S']
-        ]
+        model_features = model.feature_names_in_
+        data_df = pd.DataFrame([data])
 
-        features = np.array(ordered_features).reshape(1, -1)
-        logger.info(f"Features for model: {features}")
-
-        # Verifique se o modelo está carregado corretamente
-        if model is None:
-            raise ValueError("Model is not loaded properly")
-
-        prediction = model.predict_proba(features)[0][1]
-        logger.info(f"Prediction: {prediction}")
-
+        features_df = data_df[list(model_features)]
+        prediction = model.predict_proba(features_df)[0][1]
+        logger.info(f"prediction: {prediction}")
+    
+        data_string = json.dumps(event, cls=CustomEncoder)
         # Store result in DynamoDB
         item = {
-            'id': str(data['id']),  # Ensure ID is a string
-            'features': data,  # Store the original data received
-            'prediction': prediction
+            "id": str(data["id"]),  # Ensure ID is a string
+            "features": data_string,  # Store the original data received
+            "prediction": Decimal(str(prediction))
         }
-        table.put_item(Item=item)
-        logger.info(f"Item stored in DynamoDB: {item}")
+        try:
+            table.put_item(Item=item)
+            logger.info(f"item saved in dynamo: {item}")
+        except Exception as e:
+            logger.error(f"ERROR saving item to dynamo: {str(e)}")
 
         return buildResponse(200, {'id': data['id'], 'prediction': prediction})
 
-    except KeyError as e:
-        logger.exception(f"Key error: Missing key {str(e)}")
-        return buildResponse(400, {'message': f"Missing key: {str(e)}"})
-    except ValueError as e:
-        logger.exception(f"Value error: {str(e)}")
-        return buildResponse(500, {'message': f"Value error: {str(e)}"})
     except Exception as e:
-        logger.exception(f"Error scoring model: {str(e)}")
-        return buildResponse(500, {'message': 'Error scoring model'})
+        logger.exception(f"ERROR to score model: {str(e)}")
+        return buildResponse(501, {'message': 'ERROR to score model'})
 
 def buildResponse(status_code, body=None):
     response = {
