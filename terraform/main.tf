@@ -303,8 +303,7 @@ resource "aws_api_gateway_deployment" "api_deployment" {
     aws_api_gateway_integration.post_integration,
     aws_api_gateway_integration.get_integration,
     aws_api_gateway_integration.delete_integration,
-    aws_api_gateway_integration.health_integration,
-    aws_api_gateway_integration.swagger_get_integration
+    aws_api_gateway_integration.health_integration
   ]
   rest_api_id = aws_api_gateway_rest_api.ml_api.id
 }
@@ -316,40 +315,3 @@ resource "aws_api_gateway_stage" "my_api_stage" {
   deployment_id = aws_api_gateway_deployment.api_deployment.id
 }
 
-
-
-########################################### swagger
-resource "aws_api_gateway_resource" "swagger_resource" {
-  rest_api_id = aws_api_gateway_rest_api.ml_api.id
-  parent_id   = aws_api_gateway_rest_api.ml_api.root_resource_id
-  path_part   = "doc"
-}
-
-resource "aws_api_gateway_method" "swagger_get" {
-  rest_api_id   = aws_api_gateway_rest_api.ml_api.id
-  resource_id   = aws_api_gateway_resource.swagger_resource.id
-  http_method   = "GET"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "swagger_get_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.ml_api.id
-  resource_id             = aws_api_gateway_resource.swagger_resource.id
-  http_method             = aws_api_gateway_method.swagger_get.http_method
-  type                    = "MOCK"
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
-
-resource "aws_api_gateway_integration_response" "swagger_integration_response" {
-  depends_on  = [aws_api_gateway_integration.swagger_get_integration]
-  rest_api_id = aws_api_gateway_rest_api.ml_api.id
-  resource_id = aws_api_gateway_resource.swagger_resource.id
-  http_method = aws_api_gateway_method.swagger_get.http_method
-  status_code = "200"
-  response_templates = {
-    "application/json" = file("${path.module}/../swagger.yaml")
-  }
-}

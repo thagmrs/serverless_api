@@ -6,10 +6,10 @@ Este projeto implementa uma API serverless para prever a sobrevivência de passa
 
 - `main.tf`: Configuração principal do Terraform.
 - `variables.tf`: Declaração de variáveis.
-- `terraform.tfvars`: Valores das variáveis.
 - `lambda_function.py`: Código da função Lambda que realiza a previsão.
-- `lambda_function.zip`: Arquivo zip contendo a função Lambda.
+- `encoder_decinal.py`: Código contendo encoder para conversão de tipos aceitos pelo DynamoDB
 - `model.pkl`: Arquivo do modelo de Machine Learning (que será armazenado no S3).
+- `Dockerfile`: Arquivo Docker para criar a imagem da função Lambda.
 - `README.md`: Este arquivo.
 
 ## Pré-requisitos
@@ -24,11 +24,11 @@ Este projeto implementa uma API serverless para prever a sobrevivência de passa
 
 Execute `aws configure` e forneça suas credenciais da AWS
 
-## Peças do Projeto
-- `Lambda Function:` Função AWS Lambda que carrega um modelo de Machine Learning e expõe endpoints para escorar o modelo e manipular dados no DynamoDB.
-- `API Gateway`: Configurado para criar uma API REST que interage com a função Lambda.
-- `DynamoDB`: Armazena as avaliações de sobrevivência dos passageiros.
-- `S3 Bucket`: Armazena o modelo de Machine Learning.
+- **Lambda Function:** Função AWS Lambda que carrega um modelo de Machine Learning e expõe endpoints para escorar o modelo e manipular dados no DynamoDB.
+- **API Gateway:** Configurado para criar uma API REST que interage com a função Lambda.
+- **DynamoDB:** Armazena as avaliações de sobrevivência dos passageiros.
+- **S3 Bucket:** Armazena o modelo de Machine Learning.
+- **ECR (Elastic Container Registry):** Armazena a imagem Docker da função Lambda.
 
 ## Funcionalidade da Lambda Function
 A Lambda Function implementa os seguintes métodos HTTP:
@@ -37,24 +37,48 @@ A Lambda Function implementa os seguintes métodos HTTP:
 - `GET /sobreviventes/{id}`: Retorna a probabilidade de sobrevivência do passageiro com o ID especificado.
 - `POST /sobreviventes`: Recebe um JSON com características do passageiro e retorna a probabilidade de sobrevivência.
 - `DELETE /sobreviventes/{id}`: Remove o passageiro com o ID especificado.
+-`/health`: Verifica o status (saúde) da API
 
 
 ## Executando o Projeto
 **Configuração do Terraform:** 
 
-Atualize as variáveis no arquivo terraform.tfvars com as informações necessárias para seu ambiente AWS.
-Execute terraform init para inicializar o Terraform.
-Execute terraform apply para criar os recursos na AWS.
+1. Criação da imagem Docker e upload para o ECR
+2. Execute terraform init para inicializar o Terraform dentro da pasta /terraform
+3. Execute terraform apply para criar os recursos na AWS
 
+## Criação e Upload da Imagem Docker para ECR:
 
-Certifique-se de que o código da Lambda Function está comprimido e disponível em ${path.module}/../lambda_function/lambda_function.zip.
-A função Lambda será automaticamente implantada quando você executar o Terraform.
+1. Login no ECR:
+
+   ```sh
+aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <client_id>.dkr.ecr.<region>.amazonaws.com
+ ```
+2. Construir a Imagem Docker
+   ```sh
+docker build -t lambda-image .
+ ```
+3. Tag da imagem docker
+   ```sh
+docker tag lambda-image <client_id>.dkr.ecr.<region>.amazonaws.com/{repository_name}:{version}
+ ```
+4. Push da Imagem docker
+   ```sh
+docker push <client_id>.dkr.ecr.<region>.amazonaws.com/{repository_name}:{version}
+ ```
+## Execução do Terraform
+
+1. Na pasta /terraform execute:
+terraform init
+
+2. Aplique as configurações:
+terraform apply
 
 ## Testando a API:
 
 Após o deployment, você receberá um endpoint URL.
 Use ferramentas como curl ou Postman para enviar requisições HTTP para o endpoint.
 
-## Notas
-Certifique-se de que o arquivo lambda_function.zip contém todos os pacotes e dependências necessários.
-Ajuste o modelo e as variáveis de ambiente conforme necessário para seu caso de uso específico.
+## Documentação:
+Uma documentação swagger mockada está disponível em:
+https://app.swaggerhub.com/apis-docs/THAGMRS_1/survivors/2.0.0
