@@ -4,7 +4,10 @@ info:
   description: API for predicting Titanic survivors and managing passenger data
   version: 1.0.0
 servers:
-  - url: https://{region}.execute-api.amazonaws.com/prod
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/THAGMRS_1/sobreviventes/1.0.0
+  - url: https://ts6tzjqvk2.execute-api.us-west-2.amazonaws.com/prod
     variables:
       region:
         default: us-west-2
@@ -127,7 +130,8 @@ paths:
                 properties:
                   message:
                     type: string
-
+                    
+  /sobreviventes/{id}:
     delete:
       summary: Delete survivor by ID
       operationId: deleteSurvivor
