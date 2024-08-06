@@ -52,20 +52,16 @@ A Lambda Function implementa os seguintes métodos HTTP:
 1. Login no ECR:
 
    ```sh
-aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <client_id>.dkr.ecr.<region>.amazonaws.com
- ```
+aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <client_id>.dkr.ecr.<region>.amazonaws.com ```
 2. Construir a Imagem Docker
    ```sh
-docker build -t lambda-image .
- ```
+docker build -t lambda-image . ```
 3. Tag da imagem docker
    ```sh
-docker tag lambda-image <client_id>.dkr.ecr.<region>.amazonaws.com/{repository_name}:{version}
- ```
+docker tag lambda-image <client_id>.dkr.ecr.<region>.amazonaws.com/{repository_name}:{version} ```
 4. Push da Imagem docker
    ```sh
-docker push <client_id>.dkr.ecr.<region>.amazonaws.com/{repository_name}:{version}
- ```
+docker push <client_id>.dkr.ecr.<region>.amazonaws.com/{repository_name}:{version}  ```
 ## Execução do Terraform
 
 1. Na pasta /terraform execute:
