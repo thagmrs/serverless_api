@@ -25,6 +25,7 @@ bucket_name = os.environ.get('S3_BUCKET_NAME')
 model_key = os.environ.get('S3_MODEL_KEY')
 
 
+#Função para carregar o modelo
 def load_model_from_s3(bucket_name, model_key):
     try:
         logger.info(f"loading model from bucket: {bucket_name}, key: {model_key}")
@@ -37,7 +38,7 @@ def load_model_from_s3(bucket_name, model_key):
         logger.error(f"ERROR loading model:  {str(e)}")
         raise
 
-
+#metodos a serem definidos
 getMethod = 'GET'
 postMethod = 'POST'
 deleteMethod = 'DELETE'
@@ -51,17 +52,22 @@ def lambda_handler(event, context):
     path_parameters = event.get('queryStringParameters')
 
     try:
+        #metodo que verifica a saude da API
         if httpMethod == getMethod and path == healthPath:
             response = buildResponse(200)
+
         elif httpMethod == getMethod and path == endpointPath:
+        #metodo para retornar a lista de todos os passageiros analisados
             if path_parameters is None:
                 response = getPassengers()
+        #metodo para retornar o passageiro com o id especificado
             else:
                 passenger_id = path_parameters['id']
                 response = getId(passenger_id)
-
+        #metodo para escorar o modelo para o passageiro com as informações enviadas
         elif httpMethod == postMethod and path == endpointPath:
             response = scoreModel(event)
+        #metodo para deletar o passageiro
         elif httpMethod == deleteMethod and path == endpointPath:
             passenger_id = path_parameters['id']
             response = deleteId(passenger_id)
@@ -73,8 +79,8 @@ def lambda_handler(event, context):
 
     return response
 
+#escora o modelo
 def scoreModel(event):
-    print('ENTROU NA v0.4')
     model = load_model_from_s3(bucket_name, model_key)
 
     try:
@@ -90,10 +96,10 @@ def scoreModel(event):
         logger.info(f"prediction: {prediction}")
     
         data_string = json.dumps(event, cls=CustomEncoder)
-        # Store result in DynamoDB
+        # Armazena o resultado no DynamoDB
         item = {
-            "id": str(data["id"]),  # Ensure ID is a string
-            "features": data_string,  # Store the original data received
+            "id": str(data["id"]),  
+            "features": data_string,  
             "prediction": Decimal(str(prediction))
         }
         try:
@@ -108,6 +114,7 @@ def scoreModel(event):
         logger.exception(f"ERROR to score model: {str(e)}")
         return buildResponse(501, {'message': 'ERROR to score model'})
 
+#função para construir as respostas
 def buildResponse(status_code, body=None):
     response = {
         'statusCode': status_code,
@@ -123,6 +130,7 @@ def buildResponse(status_code, body=None):
         })
     return response
 
+#funçao para trazer as informações do passageiro especificado
 def getId(passengerId):
     try:
         response = table.get_item(
@@ -138,6 +146,7 @@ def getId(passengerId):
         logger.exception(f"Error getting passenger by ID: {str(e)}")
         return buildResponse(500, 'Error getting passenger by ID')
 
+#funcao para listar todos os passageiros
 def getPassengers():
     try:
         response = table.scan()
@@ -156,6 +165,7 @@ def getPassengers():
         logger.exception(f"Error getting passengers: {str(e)}")
         return buildResponse(500, 'Error getting passengers')
 
+#funcao para deleter as informacoes do passageiro
 def deleteId(passenger_id):
     try:
         response = table.delete_item(
