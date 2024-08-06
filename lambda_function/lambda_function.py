@@ -63,8 +63,8 @@ def lambda_handler(event, context):
         elif httpMethod == postMethod and path == endpointPath:
             response = scoreModel(event)
         elif httpMethod == deleteMethod and path == endpointPath:
-            requestBody = json.loads(event['body'])
-            response = deleteId(requestBody['id'])
+            passenger_id = path_parameters['id']
+            response = deleteId(passenger_id)
         else:
             response = buildResponse(404, 'Not Found')
     except Exception as e:

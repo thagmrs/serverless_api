@@ -1,0 +1,163 @@
+openapi: 3.0.1
+info:
+  title: ML API for Titanic Survivors Prediction
+  description: API for predicting Titanic survivors and managing passenger data
+  version: 1.0.0
+servers:
+  - url: https://{region}.execute-api.amazonaws.com/prod
+    variables:
+      region:
+        default: us-west-2
+        description: AWS region where the API is deployed
+paths:
+  /health:
+    get:
+      summary: Health Check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Health check successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Health check successful
+
+  /sobreviventes:
+    get:
+      summary: Get all survivors or a specific survivor by ID
+      operationId: getSurvivors
+      parameters:
+        - name: id
+          in: query
+          required: false
+          description: ID of the survivor to fetch
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully retrieved survivors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passengers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        features:
+                          type: string
+                        prediction:
+                          type: number
+                          format: float
+        '404':
+          description: ID not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Message:
+                    type: string
+        '500':
+          description: Error fetching survivors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+    post:
+      summary: Predict survival and save passenger data
+      operationId: predictSurvival
+      requestBody:
+        description: Passenger data for prediction
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                Age:
+                  type: number
+                Sex_male:
+                  type: integer
+                Embarked_Q:
+                  type: integer
+                Fare:
+                  type: number
+                Parch:
+                  type: integer
+                SibSp:
+                  type: integer
+                Pclass:
+                  type: integer
+                Embarked_S:
+                  type: integer
+      responses:
+        '200':
+          description: Prediction successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  prediction:
+                    type: number
+                    format: float
+        '501':
+          description: Error predicting survival
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+    delete:
+      summary: Delete survivor by ID
+      operationId: deleteSurvivor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the survivor to delete
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully deleted survivor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Operation:
+                    type: string
+                  Message:
+                    type: string
+                  deletedItem:
+                    type: object
+        '500':
+          description: Error deleting survivor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
